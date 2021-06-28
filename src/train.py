@@ -13,13 +13,16 @@ from tensorflow import keras
 BATCH_SIZE = 1024
 
 
-def getModelPath():
+def getModelPath(name=""):
     test_path = r'D:\dev\RL_Maya\tests'
     date_str = datetime.now().strftime('%Y_%m_%d_%H_%M')
     model_folder = os.path.join(test_path, date_str)
+    if name:
+        model_folder += f"_{name}"
     if not os.path.exists(model_folder):
         os.mkdir(model_folder)
     return model_folder
+
 
 def createTrainAgents(joints=['joint1', 'joint2', 'joint3'],
                       bundingBox=((-4, -5, -4), (4, 5, 4)),
@@ -58,8 +61,8 @@ def createTrainAgents(joints=['joint1', 'joint2', 'joint3'],
     return locators
 
 
-def train(mesh, drivers, agents, n_trains=8, n_episodes=16, epochs=32, batchMax=50, maxFrame=100, convergence=.98):
-    model_folder = getModelPath()
+def train(drivers, agents, name="", n_trains=8, n_episodes=16, epochs=32, batchMax=50, maxFrame=100, convergence=.98):
+    model_folder = getModelPath(name)
     backup_folder = os.path.join(model_folder, 'backup')
     if not os.path.exists(backup_folder):
         os.makedirs(backup_folder)
@@ -72,7 +75,7 @@ def train(mesh, drivers, agents, n_trains=8, n_episodes=16, epochs=32, batchMax=
     agnt_file = os.path.join(model_folder, '{}_agnt_rew.txt').format(FILE_NAME)
     with open(agnt_file, 'w') as fd:
         fd.write("")
-    env = Enviroment(agents[0], drivers, mesh, maxFrame)
+    env = Enviroment(agents[0], drivers, maxFrame)
     ppoAgent = ppo_simple.Agent(env, rwdFile, rwdDiscount=.1)
     rew_history = list()
     for tr_n in range(n_trains):
@@ -125,7 +128,6 @@ def train(mesh, drivers, agents, n_trains=8, n_episodes=16, epochs=32, batchMax=
             print(np.array(rew_history[-5:]))
             print(f"Convergence of {convergence} Reached at train {tr_n}!")
             return
-
 
 
 def train_ppo(drivers, agents, n_trains=8, n_episodes=16, epochs=32, batchMax=50, maxFrame=100):

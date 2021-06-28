@@ -4,15 +4,17 @@ from maya import cmds
 from maya.api import OpenMaya as om
 from ..maya_utils import mUtils, rewards, skinCluster, meshes
 from ..math_utils import vector_math as vm
+ACTIONS_MULTIPLIERS = [("tx", 1), ("ty", 1), ("tz", 1)]
+ACTIONS_PENALTY = [("tx", 1), ("ty", 1), ("tz", 0)]
 
 
 class Enviroment():
 
-    def __init__(self, agent, drivers, mesh, maxFrame=20, hasAnimation=False):
+    def __init__(self, agent, drivers, maxFrame=20, hasAnimation=False):
         self.agent = mUtils.MNode(agent)
         self.drivers = [mUtils.MNode(a) for a in drivers]
         self.restVector = om.MVector()
-        self.action_space = 4
+        self.action_space = len(ACTIONS_MULTIPLIERS)
         self.currentFrame = 0
         self.maxFrame = maxFrame
         self.agent_pos = None
@@ -21,10 +23,10 @@ class Enviroment():
         self.drivers_pos = list()
         self.hasAnimation = hasAnimation
         self.animations = [("attr", [0])]
-        self.mesh = mUtils.MNode(mesh)
-        self.mfn = self.mesh.getShape().getBestFn()
-        triangle_counts, triangle_vertices = self.mfn.getTriangles()
-        self.all_triangles = np.array(triangle_vertices).reshape(-1, 3)
+        # self.mesh = mUtils.MNode(mesh)
+        # self.mfn = self.mesh.getShape().getBestFn()
+        # triangle_counts, triangle_vertices = self.mfn.getTriangles()
+        # self.all_triangles = np.array(triangle_vertices).reshape(-1, 3)
         if not hasAnimation:
             self.animations = self.createAnimations()
             self.currAttr = self.animations[0][0]
@@ -39,11 +41,11 @@ class Enviroment():
         self.updateStatesCache(init=True)
         state = self.getState()
         self.observation_space = state.size
-        positions = np.array(self.mfn.getPoints(space=om.MSpace.kWorld))[:, :3]
-        self.vertices = skinCluster.getInfluencesVertices(self.mesh, [str(self.agent)], 0.05)
-        self.triangles = meshes.getVertextriangles(self.all_triangles, self.vertices)
-        self.bind_data = rewards.getTriangleBindData(self.drivers, self.triangles, positions)
-        self.bind_volume = rewards.getTrianglesVolume(positions, self.bind_data)
+        # positions = np.array(self.mfn.getPoints(space=om.MSpace.kWorld))[:, :3]
+        # self.vertices = skinCluster.getInfluencesVertices(self.mesh, [str(self.agent)], 0.05)
+        # self.triangles = meshes.getVertextriangles(self.all_triangles, self.vertices)
+        # self.bind_data = rewards.getTriangleBindData(self.drivers, self.triangles, positions)
+        # self.bind_volume = rewards.getTrianglesVolume(positions, self.bind_data)
         return state
 
     def step(self, action, addFrame=True):
@@ -91,10 +93,9 @@ class Enviroment():
             plug.setFloat(values[0])
 
     def setAction(self, action):
-        self.agent.tx.setFloat(float(action[0]))
-        self.agent.ty.setFloat(float(action[1]))
-        self.agent.tz.setFloat(float(action[2]))
-        self.agent.rx.setFloat(90.0 * float(action[3]))
+        for act, attr in zip(action, ACTIONS_MULTIPLIERS):
+            plug = getattr(self.agent, attr[0])
+            plug.set(float(attr[1]*act))
 
     def updateStatesCache(self, init=False):
         self.agent_pos = self.agent.getPosition()
@@ -150,7 +151,7 @@ class Enviroment():
         featuresNorm, mean, std = vm.featNorm(state)
         return featuresNorm
 
-    def getPoseRwdOld(self):
+    def getPoseRwd(self):
         rewards = list()
         # distance from oprimal volume preserv
         delta_dist = self.restVector.length()-self.curr_vector.length()
@@ -160,7 +161,7 @@ class Enviroment():
         return np.exp(-3 * (rewards ** 2))
         # return np.exp(-3 * rewards)
 
-    def getPoseRwd(self):
+    def getPoseRwdOld(self):
         positions = np.array(self.mfn.getPoints(space=om.MSpace.kWorld))[:, :3]
         pose_volume = rewards.getTrianglesVolume(positions, self.bind_data)
         vol_change = 1
@@ -198,16 +199,18 @@ class Enviroment():
         return rew
 
     def getGasPenalty(self):
-        translY = abs(self.agent.ty.asFloat())
-        if translY > 1:
+        penalty = 0
+        for attr, value in ACTIONS_PENALTY:
+            plug = getattr(self.agent, attr)
+            penalty += abs(plug.get()) * value
+        if penalty > 1:
             return -2
-        elif translY > .01:
-            return 1-(2**translY)
-            # return 1-np.exp(translX**2)
+        elif penalty > .01:
+            return 1-(2**penalty)
         return .0
 
     def getReward(self):
-        rew = self.getPoseRwd() + self.getCollisionReward()  # + self.getGasPenalty()
+        rew = self.getPoseRwd() + self.getCollisionReward() + self.getGasPenalty()
         return rew
 
     def getCloserSegment(self):
