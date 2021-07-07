@@ -2,6 +2,7 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 
+
 def plot_learning_courve(scores, figure_file, mean_amount=100):
     running_avg = np.zeros(len(scores))
     for i in range(len(running_avg)):
@@ -11,11 +12,13 @@ def plot_learning_courve(scores, figure_file, mean_amount=100):
     plt.savefig(figure_file)
     plt.show()
 
+
 folder = r"D:\dev\RL_Maya\tests"
 all_subdirs = [os.path.join(folder, d) for d in os.listdir(folder) if os.path.isdir(os.path.join(folder, d))]
 latest_subdir = max(all_subdirs, key=os.path.getmtime)
-#latest_subdir = os.path.join(folder, '2021_03_01_12_02')
+# latest_subdir = os.path.join(folder, '2021_03_01_12_02')
 
+"""
 fileName = 'joint1_joint2_joint3_rwd.txt'
 data_path = os.path.join(latest_subdir, fileName)
 with open(data_path) as f:
@@ -23,9 +26,13 @@ with open(data_path) as f:
 figure_file = '{}.png'.format(os.path.splitext(data_path)[0])
 score = [float(a) for a in content]
 plot_learning_courve(score, figure_file, mean_amount=1)
+
 """
-fileName = 'joint1_joint2_joint3_agnt_rew.txt'
-data_path = os.path.join(latest_subdir, fileName)
+fileName = '_agnt_rew.txt'
+found_files = [a for a in os.listdir(latest_subdir) if a.endswith(fileName)]
+if not found_files:
+    raise BaseException(f"unable to find {fileName} on {latest_subdir}")
+data_path = os.path.join(latest_subdir, found_files[0])
 with open(data_path) as f:
     content = f.read().splitlines()
 locData = dict()
@@ -34,15 +41,13 @@ for data in content:
     name = parts[-1]
     value = float(parts[0])
     locData.setdefault(name, []).append(value)
-i=0
-batch=5
+i = 0
+batch = 5
 for name, values in locData.items():
-    plt.plot(range(len(values)), values, label = name)
-    if i==batch:
-        i=0
-        plt.legend()
-        plt.show()
-        plt.clf()
-    i+=1
-#plt.savefig(figure_file)
-"""
+    print(name, values)
+    plt.plot(range(len(values)), values, label=name)
+    plt.legend()
+    plt.show()
+    figure_file = '{}.png'.format(name)
+    plt.savefig(os.path.join(latest_subdir, figure_file))
+    plt.clf()

@@ -2,10 +2,11 @@ import math
 import numpy as np
 from maya import cmds
 from maya.api import OpenMaya as om
-from ..maya_utils import mUtils, rewards, skinCluster, meshes
+from ..maya_utils import mUtils, rewards
 from ..math_utils import vector_math as vm
 ACTIONS_MULTIPLIERS = [("tx", 1), ("ty", 1), ("tz", 1)]
-ACTIONS_PENALTY = [("tx", 1), ("ty", 1), ("tz", 0)]
+# ACTIONS_MULTIPLIERS = [("ty", 1), ("tz", 1)]
+ACTIONS_PENALTY = {"tx": 1, "ty": 1, "tz": 0}
 
 
 class Enviroment():
@@ -41,6 +42,8 @@ class Enviroment():
         self.updateStatesCache(init=True)
         state = self.getState()
         self.observation_space = state.size
+        curr_coll = rewards.getAgentCollisionValue(self.agent_pos, self.drivers_pos)
+        self.startSide = math.copysign(1, curr_coll)
         # positions = np.array(self.mfn.getPoints(space=om.MSpace.kWorld))[:, :3]
         # self.vertices = skinCluster.getInfluencesVertices(self.mesh, [str(self.agent)], 0.05)
         # self.triangles = meshes.getVertextriangles(self.all_triangles, self.vertices)
@@ -142,7 +145,7 @@ class Enviroment():
         self.updateStatesCache()
         state = self.getRBDState()
         # state = list()
-        #state.extend([self.curr_vector.x, self.curr_vector.y, self.curr_vector.z])
+        # state.extend([self.curr_vector.x, self.curr_vector.y, self.curr_vector.z])
         state.extend([self.restVector.x*self.restVector.x,
                       self.restVector.y*self.restVector.y,
                       self.restVector.z*self.restVector.z])
@@ -172,41 +175,28 @@ class Enviroment():
 
     def getCollisionReward(self):
         rew = .1
-        ba = self.drivers_pos[1]-self.drivers_pos[0]
-        ca = self.drivers_pos[2]-self.drivers_pos[0]
-        # get middle plane vector, project segment into total limb extension
-        # and move that pojection into the correct position
-        m = self.drivers_pos[0]+(ca.normal()*((ba * ca) / ca.length()))
-        # check if the limb is straight, the prev projection is lenght 0
-        if m.length() == 0:
-            return rew
-        # get the prjection betwen the midle plane and the agent position
-        pb = self.agent_pos-self.drivers_pos[1]
-        proj = (m.normal()*((pb * m) / m.length()))
-        # check if the projection is on the same direction than the closer segment
-        multiply = 1
-        if self.closest_seg[1] == 2:
-            # if the start position is in the upper side reverse the direction
-            multiply = -1
-        direction = ((proj-self.agent_pos).normal()*ba.normal())*multiply
-        if direction < 0:
-            # rew = -1*(1-np.exp(-20 * ((proj-p).length())))
-            amount_collision = (proj-self.agent_pos).length()
-            if amount_collision > 2:
-                rew = -4
-            else:
-                rew = -2**amount_collision
+        scale = 2
+        curr_coll = rewards.getAgentCollisionValue(self.agent_pos, self.drivers_pos)
+        curr_side = math.copysign(1, curr_coll)
+        if curr_side != self.startSide:
+            amount_collision = np.exp(abs(curr_coll))
+            if amount_collision > scale:
+                rew = scale - amount_collision
         return rew
 
     def getGasPenalty(self):
         penalty = 0
-        for attr, value in ACTIONS_PENALTY:
+        values = list()
+        multipliers = list()
+        for attr, multipl in ACTIONS_PENALTY.items():
             plug = getattr(self.agent, attr)
-            penalty += abs(plug.get()) * value
-        if penalty > 1:
+            values.append(abs(plug.get()))
+            multipliers.append(multipl)
+        penalty = sum(vm.normalize(values)*multipliers)
+        if penalty > 2:
             return -2
         elif penalty > .01:
-            return 1-(2**penalty)
+            return penalty*-1
         return .0
 
     def getReward(self):

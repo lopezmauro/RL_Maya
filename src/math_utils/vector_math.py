@@ -137,10 +137,8 @@ def getTriangleVolume(start, end, triangle_position):
         points = [np.append(a, 1) for a in triangle_position]
         bind_pos = [np.dot(a, root_mtx_inv) for a in points]
         heights_mean = sum([a[1] for a in bind_pos])/len(points)
-        # projection = np.array(bind_pos)
-        # projection[:,1] = 0
-        # projection = [np.dot(a, root_mtx)[:3] for a in projection]
     return (cross_lenght/2.0) * heights_mean
+
 
 def getCloserIndex(point, points):
     """the closes index of a point in a point list
@@ -154,3 +152,9 @@ def getCloserIndex(point, points):
     pointsAr = np.asarray(points)
     distances = np.sum((pointsAr - np.array(point))**2, axis=1)
     return np.argmin(distances)
+
+
+def projectVector(source, projection):
+    np_source = np.array(source)
+    np_projection = np.array(projection)
+    return normalize(np_source) * ((np_projection @ np_source) / magnitude(np_source))

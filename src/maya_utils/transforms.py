@@ -1,6 +1,7 @@
 from maya import cmds
 import numpy as np
 from ..math_utils import vector_math as vm
+JOINT_METADATA = "isJoint"
 
 
 def createAimedJoint(pos, joints):
@@ -9,10 +10,11 @@ def createAimedJoint(pos, joints):
     closes_pnt, closerSeg = vm.getCloserSegment(pos, segments_pos)
     zAxis = vm.normalize(pos - closes_pnt)
     yAxis = vm.normalize(segments_pos[closerSeg[1]] - segments_pos[closerSeg[0]])
-    xAxis = vm.normalize(np.cross(yAxis, zAxis)) 
-    zAxis = vm.normalize(np.cross(xAxis, yAxis))
+    xAxis = vm.normalize(np.cross(yAxis, zAxis))
+    yAxis = vm.normalize(np.cross(zAxis, xAxis))
     jnt = cmds.joint()
     grp = cmds.group(jnt)
+    cmds.addAttr(grp, longName=JOINT_METADATA, at="bool", keyable=False)
     matrix = list(xAxis)
     matrix.append(0)
     matrix.extend(yAxis)

@@ -121,7 +121,7 @@ class MPlug(om.MPlug):
         # Float Groups - rotate, translate, scale; Compounds
         if apiType in [om.MFn.kAttribute3Double, om.MFn.kAttribute3Float, om.MFn.kCompoundAttribute]:
             result = []
-            if self.isCompound():
+            if self.isCompound:
                 for c in xrange(self.numChildren()):
                     result.append(self.get(self.child(c)))
                 return result

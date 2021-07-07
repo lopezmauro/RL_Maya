@@ -10,6 +10,8 @@ DELTA_VOLUME_ATTR = "deltaVolume"
 CLUSTER_VERTICES_ATTR = "clustersVertices"
 CLUSTER_JOINTS_ATTR = "clustersJoints"
 CLUSTER_WEIGHTS_ATTR = "clustersWeights"
+ALL_METADATA_ATTR = [DELTA_VOLUME_ATTR, CLUSTER_VERTICES_ATTR,
+                     CLUSTER_JOINTS_ATTR, CLUSTER_WEIGHTS_ATTR]
 
 
 def getVolumeChange(mesh, joints):
@@ -25,13 +27,16 @@ def getVolumeChange(mesh, joints):
     deformation_volume = list()
     animations = attrUtils.getAnimationValues(2)
     default_mxt = cmds.xform(joints[1], q=1, ws=1, m=1)
-    with attrUtils.DisconnectCtx(joints, source=True, destination=False):
+    decendant = set(joints)
+    for jnt in joints:
+        decendant.update(cmds.listRelatives(jnt, ad=1, type="joint"))
+    with attrUtils.DisconnectCtx(decendant, source=True, destination=False):
         for attr, values in animations:
             cmds.setAttr(f"{joints[1]}.{attr}", math.degrees(values[-1]))
             deformed_positions = np.array(mfn.getPoints(space=om.MSpace.kWorld))
             deformation_volume.append(rewards.getTrianglesVolume(deformed_positions, bind_data))
         cmds.xform(joints[1], ws=1, m=default_mxt)
-    delta_volume_vtx = np.zeros((len(vertices)), np.float16)
+    delta_volume_vtx = np.zeros((len(positions)), np.float16)
     for i, data in bind_data.items():
         for deformed in deformation_volume:
             delta = abs(bind_volume[i] - deformed[i])
@@ -60,9 +65,10 @@ def createClustersJoints(mesh, joints, wrong_vtx, delta_volume_vtx, cluster_n=4)
     raw_data = list()
     for x in wrong_vtx:
         pos = positions[x]
-        vol_normal = normals[x] * delta_volume_vtx[x]
+        vol_normal = normals[x]
         data = list(pos)
         data.extend(vol_normal)
+        data.append(delta_volume_vtx[x])
         raw_data.append(data)
     raw_data = np.array(raw_data)
     m, centroids, m1 = fuzzyCMeans.fcm(raw_data, cluster_n, expo, min_err, max_iter, verbose)
@@ -115,13 +121,20 @@ def applyClustersDefaultSkin(mesh, clusters_joints, clusters_vertices, clusters_
     skinCluster.setSkinWeights(skin_cluster, relaxedMap)
 
 
-def setMetadataAttribute(node, attr_name, data):
+def setMetadataAttribute(node, attr_name, data, storable=False):
     if not cmds.objExists(f"{node}.{attr_name}"):
-        cmds.addAttr(node, longName=attr_name, dt="string", storable=False)
+        cmds.addAttr(node, longName=attr_name, dt="string", storable=storable)
     cmds.setAttr(f"{node}.{attr_name}", str(data), type="string")
 
 
+def clearMetadata(node):
+    for attr_name in ALL_METADATA_ATTR:
+        if cmds.objExists(f"{node}.{attr_name}"):
+            cmds.setAttr(f"{node}.{attr_name}", "", type="string")
+
+
 def initData(mesh, joints):
+    clearMetadata(mesh)
     delta_volume_vtx = getVolumeChange(mesh, joints)
     data_list = delta_volume_vtx.tolist()
     setMetadataAttribute(mesh, DELTA_VOLUME_ATTR, str(data_list))
@@ -136,7 +149,7 @@ def selectAffectedVertices(mesh, tolerance=0.03, select=True):
         raise BaseException(f"unable to find {DELTA_VOLUME_ATTR} data in {mesh} was not inited")
     delta_volume_vtx = np.array(eval(delta_str))
     wrong_vtx = getVolumeLossVertices(delta_volume_vtx, tolerance)
-    setMetadataAttribute(mesh, CLUSTER_VERTICES_ATTR, wrong_vtx)
+    setMetadataAttribute(mesh, CLUSTER_VERTICES_ATTR, wrong_vtx, storable=True)
     if select:
         cmds.select(cl=1)
         for i in wrong_vtx:
@@ -165,16 +178,23 @@ def initClustersJoints(mesh, joints, cluster_n=4, tolerance=0.03):
         cluster_joints_str = cmds.getAttr(f"{mesh}.{CLUSTER_JOINTS_ATTR}")
     if cluster_joints_str:
         old_joints = [a for a in eval(cluster_joints_str) if cmds.objExists(a)]
-        cmds.delete(old_joints)
+        to_delete = set()
+        for jnt in old_joints:
+            prnt = cmds.listRelatives(jnt, p=1)
+            if prnt and cmds.objExists(f"{prnt[0]}.{transforms.JOINT_METADATA}"):
+                to_delete.add(prnt[0])
+            else:
+                to_delete.add(jnt)
+        cmds.delete(to_delete)
 
     cluster_joints, cluster_weights = createClustersJoints(mesh,
                                                            joints,
                                                            clusters_vertices,
                                                            delta_volume_vtx,
                                                            cluster_n)
-    setMetadataAttribute(mesh, CLUSTER_JOINTS_ATTR, cluster_joints)
+    setMetadataAttribute(mesh, CLUSTER_JOINTS_ATTR, cluster_joints, storable=True)
     data_list = cluster_weights.tolist()
-    setMetadataAttribute(mesh, CLUSTER_WEIGHTS_ATTR, str(data_list))
+    setMetadataAttribute(mesh, CLUSTER_WEIGHTS_ATTR, str(data_list), storable=True)
     return cluster_joints, cluster_weights
 
 
