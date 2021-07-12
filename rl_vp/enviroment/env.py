@@ -2,11 +2,9 @@ import math
 import numpy as np
 from maya import cmds
 from maya.api import OpenMaya as om
-from ..maya_utils import mUtils, rewards
-from ..math_utils import vector_math as vm
-ACTIONS_MULTIPLIERS = [("tx", 1), ("ty", 1), ("tz", 1)]
-# ACTIONS_MULTIPLIERS = [("ty", 1), ("tz", 1)]
-ACTIONS_PENALTY = {"tx": 1, "ty": 1, "tz": 0}
+from . import observation, constants
+from rl_vp.maya_utils import mUtils, rewards
+from rl_vp.math_utils import vector_math as vm
 
 
 class Enviroment():
@@ -15,7 +13,9 @@ class Enviroment():
         self.agent = mUtils.MNode(agent)
         self.drivers = [mUtils.MNode(a) for a in drivers]
         self.restVector = om.MVector()
+        self.rest_distance = 1
         self.action_space = len(ACTIONS_MULTIPLIERS)
+        self.closest_seg = list()
         self.currentFrame = 0
         self.maxFrame = maxFrame
         self.agent_pos = None
@@ -39,11 +39,14 @@ class Enviroment():
         self.currentFrame = 0
         cmds.currentTime(self.currentFrame)
         self.setAction([0]*self.action_space)
-        self.updateStatesCache(init=True)
+        self.updateStatesCache()
+        _, self.closest_seg = self.getCloserSegment()
+        self.restVector = self.getAgentToSegmentVector()
         state = self.getState()
         self.observation_space = state.size
         curr_coll = rewards.getAgentCollisionValue(self.agent_pos, self.drivers_pos)
         self.startSide = math.copysign(1, curr_coll)
+        self.rest_distance = vm.magnitude(self.restVector)
         # positions = np.array(self.mfn.getPoints(space=om.MSpace.kWorld))[:, :3]
         # self.vertices = skinCluster.getInfluencesVertices(self.mesh, [str(self.agent)], 0.05)
         # self.triangles = meshes.getVertextriangles(self.all_triangles, self.vertices)
@@ -96,63 +99,30 @@ class Enviroment():
             plug.setFloat(values[0])
 
     def setAction(self, action):
-        for act, attr in zip(action, ACTIONS_MULTIPLIERS):
+        for act, attr in zip(action, constants.ACTIONS_MULTIPLIERS):
             plug = getattr(self.agent, attr[0])
-            plug.set(float(attr[1]*act))
+            plug.set(float(attr[1]*act*self.rest_distance))
 
-    def updateStatesCache(self, init=False):
+    def updateStatesCache(self):
         self.agent_pos = self.agent.getPosition()
         self.agent_mtx = self.agent.getMatrix()
         self.drivers_mtx = [a.getMatrix() for a in self.drivers]
         self.drivers_pos = [a.getPosition() for a in self.drivers]
-        if init:
-            self.closest_point, self.closest_seg = self.getCloserSegment()
-            self.restVector = self.getAgentToSegmentVector()
         self.curr_vector = self.getAgentToSegmentVector()
 
     def getAgentToSegmentVector(self):
+        if not self.closest_seg:
+            return om.MPoint()
         parentMatrix = self.drivers_mtx[self.closest_seg[0]]
         closestPnt = vm.closestPointInLine(self.drivers_pos[self.closest_seg[0]],
                                            self.drivers_pos[self.closest_seg[1]],
                                            self.agent_pos)
         return parentMatrix*(om.MPoint(self.agent_pos)-om.MPoint(closestPnt))
 
-    def getRBDState(self):
-        observation = list()
-        for drv_mtx in self.drivers_mtx:
-            # get relative position
-            localMat = self.agent_mtx*drv_mtx.inverse()
-            localTrf = om.MTransformationMatrix(localMat)
-            rbd_lTr = localTrf.translation(om.MSpace.kObject)
-            observation.extend([rbd_lTr.x, rbd_lTr.y, rbd_lTr.z])
-        """
-        for driver in self.drivers:
-            matrx = driver.attr('worldMatrix').get()
-            localTrf = pmc.datatypes.TransformationMatrix(matrx)
-            rbd_lOri = localTrf.rotation(asQuaternion=True)
-            observation.extend(rbd_lOri)
-        localMat = self.agent_mtx * self.drivers_mtx[1].inverse()
-        localTrf = om.MTransformationMatrix(localMat)
-        rbd_lTr = localTrf.translation(om.MSpace.kObject)
-        observation.extend([rbd_lTr.x, rbd_lTr.y, rbd_lTr.z])
-        """
-        localTrf = om.MTransformationMatrix(self.drivers_mtx[1])
-        rbd_lOri = localTrf.rotation(asQuaternion=True)
-        observation.extend(rbd_lOri)
-        return observation
-
     def getState(self):
         self.updateStatesCache()
-        state = self.getRBDState()
-        # state = list()
-        # state.extend([self.curr_vector.x, self.curr_vector.y, self.curr_vector.z])
-        state.extend([self.restVector.x*self.restVector.x,
-                      self.restVector.y*self.restVector.y,
-                      self.restVector.z*self.restVector.z])
-        state.extend([self.restVector.x, self.restVector.y, self.restVector.z])
-        # return np.array(state)
-        featuresNorm, mean, std = vm.featNorm(state)
-        return featuresNorm
+        obs = observation.getObservation(self.drivers_mtx, self.agent_mtx, self.restVector)
+        return obs
 
     def getPoseRwd(self):
         rewards = list()
@@ -188,9 +158,9 @@ class Enviroment():
         penalty = 0
         values = list()
         multipliers = list()
-        for attr, multipl in ACTIONS_PENALTY.items():
+        for attr, multipl in constants.ACTIONS_PENALTY.items():
             plug = getattr(self.agent, attr)
-            values.append(abs(plug.get()))
+            values.append(abs(plug.get())/self.rest_distance)
             multipliers.append(multipl)
         penalty = sum(vm.normalize(values)*multipliers)
         if penalty > 2:

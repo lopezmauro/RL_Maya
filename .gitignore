@@ -4,6 +4,5 @@ __pycache__/
 *$py.class
 
 tests/
-src/ppo_torch/
 workspace.code-workspace
 .vscode/settings.json

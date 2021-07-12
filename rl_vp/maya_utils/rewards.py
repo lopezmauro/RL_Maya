@@ -1,10 +1,7 @@
-import math
 import numpy as np
 from maya import cmds
 from maya.api import OpenMaya as om
-from . import mUtils, skinCluster, meshes, attrUtils, transforms
-from ..math_utils import vector_math as vm
-from ..math_utils import fuzzyCMeans
+from rl_vp.math_utils import vector_math as vm
 
 
 def getTriangleBindData(joints, triangles, positions):

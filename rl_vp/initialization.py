@@ -2,9 +2,9 @@ import math
 import numpy as np
 from maya import cmds
 from maya.api import OpenMaya as om
-from .maya_utils import mUtils, skinCluster, meshes, attrUtils, transforms, rewards
-from .math_utils import vector_math as vm
-from .math_utils import fuzzyCMeans
+from rl_vp.maya_utils import mUtils, skinCluster, meshes, attrUtils, transforms, rewards
+from rl_vp.math_utils import vector_math as vm
+from rl_vp.math_utils import fuzzyCMeans
 
 DELTA_VOLUME_ATTR = "deltaVolume"
 CLUSTER_VERTICES_ATTR = "clustersVertices"

@@ -1,6 +1,6 @@
 from maya import cmds
 import numpy as np
-from ..math_utils import vector_math as vm
+from rl_vp.math_utils import vector_math as vm
 JOINT_METADATA = "isJoint"
 
 

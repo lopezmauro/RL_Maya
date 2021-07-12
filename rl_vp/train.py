@@ -1,14 +1,16 @@
 import os
 import imp
 import numpy as np
-from .enviroment.env import Enviroment
-from .ppo import ppo_simple
-from .ppo import ppo
-from .math_utils import sampling
-from .math_utils import vector_math as vm
+from rl_vp.enviroment.env import Enviroment
+from rl_vp.ppo import ppo_simple
+from rl_vp.ppo import ppo
+from rl_vp.math_utils import sampling
+from rl_vp.math_utils import vector_math as vm
 from maya import cmds
 from datetime import datetime
 from tensorflow import keras
+import tensorflow as tf
+
 # episode simulation and nn hyper params
 BATCH_SIZE = 1024
 
@@ -121,7 +123,9 @@ def train(drivers, agents, name="", n_trains=8, n_episodes=16, epochs=32, batchM
             fd.write(f"{rewd_mean}\n")
         with open(agnt_file, 'a') as fd:
             fd.write(f"{rewd_mean} : {curr_agent}\n")
-        ppoAgent.result_model.save(os.path.join(model_folder, f'{FILE_NAME}_{tr_n:02d}.h5'))
+        # ppoAgent.result_model.save(os.path.join(model_folder, f'{FILE_NAME}_{tr_n:02d}.h5'))
+        tf.saved_model.save(ppoAgent.result_model, os.path.join(model_folder, f'{FILE_NAME}_{tr_n:02d}.h5'))
+
         ppoAgent.actor.save(os.path.join(backup_folder, f'{FILE_NAME}_actor_{tr_n:02d}.h5'))
         ppoAgent.critic.save(os.path.join(backup_folder, f'{FILE_NAME}_critic_{tr_n:02d}.h5'))
         if len(rew_history) > 5 and (np.array(rew_history[-5:]) >= convergence).all():
