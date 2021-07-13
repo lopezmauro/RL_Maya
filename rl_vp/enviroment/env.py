@@ -14,7 +14,7 @@ class Enviroment():
         self.drivers = [mUtils.MNode(a) for a in drivers]
         self.restVector = om.MVector()
         self.rest_distance = 1
-        self.action_space = len(ACTIONS_MULTIPLIERS)
+        self.action_space = len(constants.ACTIONS_MULTIPLIERS)
         self.closest_seg = list()
         self.currentFrame = 0
         self.maxFrame = maxFrame
@@ -117,7 +117,7 @@ class Enviroment():
         closestPnt = vm.closestPointInLine(self.drivers_pos[self.closest_seg[0]],
                                            self.drivers_pos[self.closest_seg[1]],
                                            self.agent_pos)
-        return parentMatrix*(om.MPoint(self.agent_pos)-om.MPoint(closestPnt))
+        return om.MVector(om.MPoint(self.agent_pos)-om.MPoint(closestPnt))
 
     def getState(self):
         self.updateStatesCache()
@@ -132,16 +132,6 @@ class Enviroment():
         dot_p = 1-(self.curr_vector.normal()*self.restVector.normal())
         rewards = delta_dist+dot_p
         return np.exp(-3 * (rewards ** 2))
-        # return np.exp(-3 * rewards)
-
-    def getPoseRwdOld(self):
-        positions = np.array(self.mfn.getPoints(space=om.MSpace.kWorld))[:, :3]
-        pose_volume = rewards.getTrianglesVolume(positions, self.bind_data)
-        vol_change = 1
-        for i, bind_vol in self.bind_volume.items():
-            delta = abs(bind_vol - pose_volume[i])
-            vol_change -= delta
-        return vol_change
 
     def getCollisionReward(self):
         rew = .1

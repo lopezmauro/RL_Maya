@@ -3,7 +3,6 @@ import imp
 import numpy as np
 from rl_vp.enviroment.env import Enviroment
 from rl_vp.ppo import ppo_simple
-from rl_vp.ppo import ppo
 from rl_vp.math_utils import sampling
 from rl_vp.math_utils import vector_math as vm
 from maya import cmds
@@ -123,8 +122,8 @@ def train(drivers, agents, name="", n_trains=8, n_episodes=16, epochs=32, batchM
             fd.write(f"{rewd_mean}\n")
         with open(agnt_file, 'a') as fd:
             fd.write(f"{rewd_mean} : {curr_agent}\n")
-        # ppoAgent.result_model.save(os.path.join(model_folder, f'{FILE_NAME}_{tr_n:02d}.h5'))
-        tf.saved_model.save(ppoAgent.result_model, os.path.join(model_folder, f'{FILE_NAME}_{tr_n:02d}.h5'))
+        ppoAgent.result_model.save(os.path.join(model_folder, f'{FILE_NAME}_{tr_n:02d}.h5'))
+        # tf.saved_model.save(ppoAgent.result_model, os.path.join(model_folder, f'{FILE_NAME}_{tr_n:02d}.h5'))
 
         ppoAgent.actor.save(os.path.join(backup_folder, f'{FILE_NAME}_actor_{tr_n:02d}.h5'))
         ppoAgent.critic.save(os.path.join(backup_folder, f'{FILE_NAME}_critic_{tr_n:02d}.h5'))
@@ -132,51 +131,3 @@ def train(drivers, agents, name="", n_trains=8, n_episodes=16, epochs=32, batchM
             print(np.array(rew_history[-5:]))
             print(f"Convergence of {convergence} Reached at train {tr_n}!")
             return
-
-
-def train_ppo(drivers, agents, n_trains=8, n_episodes=16, epochs=32, batchMax=50, maxFrame=100):
-    # Exploration settings
-    model_folder = getModelPath()
-    backup_folder = os.path.join(model_folder, 'backup')
-    if not os.path.exists(backup_folder):
-        os.makedirs(backup_folder)
-
-    FILE_NAME = "_".join(drivers)
-    rwdFile = os.path.join(model_folder, f'{FILE_NAME}_epRwd.txt')
-    score_file = os.path.join(model_folder, f'{FILE_NAME}_rwd.txt')
-    with open(score_file, 'w') as fd:
-        fd.write("")
-    agnt_file = os.path.join(model_folder, f'{FILE_NAME}_agnt_rew.txt')
-    with open(agnt_file, 'w') as fd:
-        fd.write("")
-    env = Enviroment(agents[0], drivers, maxFrame)
-    ppoAgent = ppo.Agent(env, rwdFile)
-    for i in range(n_trains):
-        np.random.shuffle(agents)
-        agnt_to_train = agents[:batchMax]
-        rwd_h = list()
-        for curr_agent in agnt_to_train:
-            cmds.hide(agents)
-            cmds.showHidden(curr_agent)
-            # re initi with random agent
-            env.reInit(curr_agent)
-            env.reset()
-            obs, action, pred, reward = ppoAgent.get_batch(n_episodes)
-            old_prediction = pred
-            pred_values = ppoAgent.critic.predict(obs)
-            advantage = reward - pred_values
-            all_advg_dim = advantage.copy()
-            for a in range(env.action_space-1):
-                all_advg_dim = np.append(all_advg_dim, advantage, axis=1)
-            ppoAgent.actor.fit([obs, all_advg_dim, old_prediction], [action], batch_size=BATCH_SIZE, epochs=epochs, verbose=2)
-            ppoAgent.critic.fit([obs], [reward], batch_size=BATCH_SIZE, epochs=epochs, verbose=2)
-            rewd_mean = np.mean(reward)
-            with open(score_file, 'a') as fd:
-                fd.write(f"{rewd_mean}\n")
-            with open(agnt_file, 'a') as fd:
-                fd.write(f"{rewd_mean} : {curr_agent}\n")
-        score_file = os.path.join(model_folder, '{}_rwd.csv').format(FILE_NAME)
-        ppoAgent.result_model.save(os.path.join(model_folder, f'{FILE_NAME}_{i:02d}.h5'))
-        ppoAgent.actor.save(os.path.join(backup_folder, f'{FILE_NAME}_actor_{i:02d}.h5'))
-        ppoAgent.critic.save(os.path.join(backup_folder, f'{FILE_NAME}_critic_{i:02d}.h5'))
-        np.savetxt(score_file, rwd_h)

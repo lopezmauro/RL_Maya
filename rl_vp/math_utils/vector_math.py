@@ -17,7 +17,7 @@ def pointToLineDistance(start, end, point):
     if all(A == P) or all(B == P):
         return 0
     if all(A == B):
-        return np.dist(A, P)
+        return magnitude(P-A)
     if np.arccos(np.dot((P - A) / magnitude(P - A), (B - A) / magnitude(B - A))) > np.pi / 2:
         return magnitude(P - A)
     if np.arccos(np.dot((P - B) / magnitude(P - B), (A - B) / magnitude(A - B))) > np.pi / 2:

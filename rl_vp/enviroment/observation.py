@@ -31,3 +31,11 @@ def getObservation(drivers_mtx, agent_mtx, restVector):
     # return np.array(state)
     featuresNorm, mean, std = vm.featNorm(observation)
     return featuresNorm
+
+
+def getRestVector(drivers_mtx, agent_mtx):
+    drivers_pos = [list(a)[12:15] for a in drivers_mtx]
+    agent_pos = list(agent_mtx)[12:15]
+    closestPnt, closest_seg = vm.getCloserSegment(agent_pos, drivers_pos)
+    parentMatrix = drivers_mtx[closest_seg[0]]
+    return om.MVector(om.MPoint(agent_pos)-om.MPoint(closestPnt))
