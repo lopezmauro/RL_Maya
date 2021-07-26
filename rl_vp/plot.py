@@ -16,7 +16,7 @@ def plot_learning_courve(scores, figure_file, mean_amount=100):
 folder = r"D:\dev\RL_Maya\tests"
 # all_subdirs = [os.path.join(folder, d) for d in os.listdir(folder) if os.path.isdir(os.path.join(folder, d))]
 # latest_subdir = max(all_subdirs, key=os.path.getmtime)
-latest_subdir = os.path.join(folder, '2021_07_08_18_22_goblin_mtx_collision_joint4_normalized')
+latest_subdir = os.path.join(folder, '2021_07_20_23_18_goblin_mtx_collision_joint1_3_actions')
 
 """
 fileName = 'joint1_joint2_joint3_rwd.txt'

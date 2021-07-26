@@ -24,18 +24,18 @@ def getObservation(drivers_mtx, agent_mtx, restVector):
     localTrf = om.MTransformationMatrix(drivers_mtx[1])
     rbd_lOri = localTrf.rotation(asQuaternion=True)
     observation.extend(rbd_lOri)
+    # state = list()
+    # observation.extend([curr_vector.x, curr_vector.y, curr_vector.z])
     observation.extend([restVector.x*restVector.x,
                         restVector.y*restVector.y,
                         restVector.z*restVector.z])
     observation.extend([restVector.x, restVector.y, restVector.z])
     # return np.array(state)
-    featuresNorm, mean, std = vm.featNorm(observation)
+    featuresNorm, _, _ = vm.featNorm(observation)
     return featuresNorm
-
 
 def getRestVector(drivers_mtx, agent_mtx):
     drivers_pos = [list(a)[12:15] for a in drivers_mtx]
     agent_pos = list(agent_mtx)[12:15]
-    closestPnt, closest_seg = vm.getCloserSegment(agent_pos, drivers_pos)
-    parentMatrix = drivers_mtx[closest_seg[0]]
+    closestPnt, _ = vm.getCloserSegment(agent_pos, drivers_pos)
     return om.MVector(om.MPoint(agent_pos)-om.MPoint(closestPnt))

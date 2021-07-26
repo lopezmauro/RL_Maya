@@ -2,7 +2,8 @@ import math
 import numpy as np
 from maya import cmds
 from maya.api import OpenMaya as om
-from rl_vp.maya_utils import mUtils, skinCluster, meshes, attrUtils, transforms, rewards
+from rl_vp.enviroment import rewards
+from rl_vp.maya_utils import mUtils, skinCluster, meshes, attrUtils, transforms
 from rl_vp.math_utils import vector_math as vm
 from rl_vp.math_utils import fuzzyCMeans
 

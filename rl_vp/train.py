@@ -1,18 +1,19 @@
 import os
-import imp
+import logging
 import numpy as np
-from rl_vp.enviroment.env import Enviroment
 from rl_vp.ppo import ppo_simple
+from rl_vp.enviroment.env import Enviroment
 from rl_vp.math_utils import sampling
 from rl_vp.math_utils import vector_math as vm
 from maya import cmds
 from datetime import datetime
 from tensorflow import keras
-import tensorflow as tf
 
+logger = logging.getLogger(__name__)
 # episode simulation and nn hyper params
 BATCH_SIZE = 1024
-
+GOAL_REWARD = .98
+GOAL_ESPISODES = 5
 
 def getModelPath(name=""):
     test_path = r'D:\dev\RL_Maya\tests'
@@ -62,7 +63,7 @@ def createTrainAgents(joints=['joint1', 'joint2', 'joint3'],
     return locators
 
 
-def train(drivers, agents, name="", n_trains=8, n_episodes=16, epochs=32, batchMax=50, maxFrame=100, convergence=.98):
+def train(drivers, agents, name="", n_trains=8, n_episodes=16, epochs=32, batchMax=50, maxFrame=100):
     model_folder = getModelPath(name)
     backup_folder = os.path.join(model_folder, 'backup')
     if not os.path.exists(backup_folder):
@@ -91,12 +92,17 @@ def train(drivers, agents, name="", n_trains=8, n_episodes=16, epochs=32, batchM
             cmds.showHidden(curr_agent)
             # re initi with random agent
             env.reInit(curr_agent)
-            env.reset()
-            states, rwds, actions, real_rewd = ppoAgent.get_batch(n_episodes)
+            states, rwds, actions, real_rewd = ppoAgent.get_batch(n_episodes, tr_n)
             all_states = np.vstack([all_states, states])
             all_actions = np.vstack([all_actions, actions])
             all_rwds = np.vstack([all_rwds, rwds])
             all_real_rwds = np.vstack([all_real_rwds, real_rewd])
+        randomize = np.arange(len(all_states))
+        np.random.shuffle(randomize)
+        all_states = all_states[randomize]
+        all_actions = all_actions[randomize]
+        all_rwds = all_rwds[randomize]
+        all_real_rwds = all_real_rwds[randomize]
         # Train the model ------------------
         # get instance of early stopping callback, it stop if the model doesnt learn
         early_stop_patient = keras.callbacks.EarlyStopping(patience=8)
@@ -109,6 +115,7 @@ def train(drivers, agents, name="", n_trains=8, n_episodes=16, epochs=32, batchM
         # evaluate how advantageous an action is
         all_advg = np.maximum(0, all_rwds - all_values)
         all_advg /= np.max(all_advg)
+        # add a advantage dimension for each action else fit will fail
         all_advg_dim = all_advg.copy()
         for a in range(env.action_space-1):
             all_advg_dim = np.append(all_advg_dim, all_advg, axis=1)
@@ -116,7 +123,7 @@ def train(drivers, agents, name="", n_trains=8, n_episodes=16, epochs=32, batchM
         ppoAgent.actor.fit([all_states, all_advg_dim], all_actions,
                             verbose=2, epochs=epochs, batch_size=BATCH_SIZE)
 
-        rewd_mean = np.mean(real_rewd)
+        rewd_mean = np.mean(all_real_rwds)
         rew_history.append(rewd_mean)
         with open(score_file, 'a') as fd:
             fd.write(f"{rewd_mean}\n")
@@ -127,7 +134,7 @@ def train(drivers, agents, name="", n_trains=8, n_episodes=16, epochs=32, batchM
 
         ppoAgent.actor.save(os.path.join(backup_folder, f'{FILE_NAME}_actor_{tr_n:02d}.h5'))
         ppoAgent.critic.save(os.path.join(backup_folder, f'{FILE_NAME}_critic_{tr_n:02d}.h5'))
-        if len(rew_history) > 5 and (np.array(rew_history[-5:]) >= convergence).all():
-            print(np.array(rew_history[-5:]))
-            print(f"Convergence of {convergence} Reached at train {tr_n}!")
+        if len(rew_history) > GOAL_ESPISODES and (np.array(rew_history[GOAL_ESPISODES*-1:]) >= GOAL_REWARD).all():
+            logger.debug(np.array(rew_history[GOAL_ESPISODES*-1:]))
+            logger.info(f"Convergence of {GOAL_REWARD} Reached at train {tr_n}!")
             return

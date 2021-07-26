@@ -71,7 +71,6 @@ class RLVPNode(om.MPxNode):
             print(float(act*mult*rest_vect.length()))
             attr_h.setDouble(float(act*mult*rest_vect.length()))
             datablock.setClean(attr)
-
         # The plug was successfully computed
         return self
 

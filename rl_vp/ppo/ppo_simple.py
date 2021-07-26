@@ -1,10 +1,12 @@
 
+import logging
 from tensorflow.keras.models import Model, load_model
 import tensorflow.keras.layers as layers
 import tensorflow.keras.backend as K
 import numpy as np
 from tensorflow.python.framework.ops import disable_eager_execution
 disable_eager_execution()
+logger = logging.getLogger(__name__)
 
 
 class Agent:
@@ -84,7 +86,7 @@ class Agent:
             discounted_r[t] = running_add
         return discounted_r
 
-    def get_batch(self, n_episodes):
+    def get_batch(self, n_episodes, train_number=0):
         all_states = np.array([]).reshape(0, self.num_states).astype(np.float32)
         all_actions = np.array([]).reshape(0, self.num_actions).astype(np.float32)
         all_dsc_real_rwds = all_dsc_rwds = np.array([]).reshape(0, 1).astype(np.float32)
@@ -117,5 +119,5 @@ class Agent:
                 all_dsc_rwds = np.vstack([all_dsc_rwds, dsc_rwds])
                 real_dsc_rwds = self.discount_rewards(ep_real_rwds, self.rwdDiscount)
                 all_dsc_real_rwds = np.vstack([all_dsc_real_rwds, real_dsc_rwds])
-            print(f'Episode {self.env.agent} avg. reward {np.mean(all_dsc_real_rwds)}')
+            logger.info(f'{self.env.agent} Train {train_number} Episode {j}  Avg. reward {np.mean(all_dsc_real_rwds)}')
         return all_states, all_dsc_rwds, all_actions, all_dsc_real_rwds
