@@ -14,9 +14,9 @@ def plot_learning_courve(scores, figure_file, mean_amount=100):
 
 
 folder = r"D:\dev\RL_Maya\tests"
-# all_subdirs = [os.path.join(folder, d) for d in os.listdir(folder) if os.path.isdir(os.path.join(folder, d))]
-# latest_subdir = max(all_subdirs, key=os.path.getmtime)
-latest_subdir = os.path.join(folder, '2021_07_20_23_18_goblin_mtx_collision_joint1_3_actions')
+all_subdirs = [os.path.join(folder, d) for d in os.listdir(folder) if os.path.isdir(os.path.join(folder, d))]
+latest_subdir = max(all_subdirs, key=os.path.getmtime)
+#latest_subdir = os.path.join(folder, '2021_07_29_15_09_goblin_mtx_collision_joint1_disc_03')
 
 """
 fileName = 'joint1_joint2_joint3_rwd.txt'
@@ -45,9 +45,11 @@ i = 0
 batch = 5
 for name, values in locData.items():
     print(name, values)
+    figure_file = '{}.png'.format(name)
+    plot_learning_courve(values, os.path.join(latest_subdir, figure_file), mean_amount=50)
+    continue
     plt.plot(range(len(values)), values, label=name)
     plt.legend()
     plt.show()
-    figure_file = '{}.png'.format(name)
     plt.savefig(os.path.join(latest_subdir, figure_file))
     plt.clf()

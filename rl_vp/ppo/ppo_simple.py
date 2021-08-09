@@ -93,31 +93,27 @@ class Agent:
         # Decay epsilon gradient for noise reduction each step
         epsilonGradient = np.linspace(self.minEpsilon, self.epsilon, n_episodes)[::-1]
         for j in range(n_episodes):
-            # re/start simulation
-            for attr, values in self.env.animations:
-                done = False
-                ep_rwds = np.array([]).reshape(0, 1).astype(np.float32)
-                ep_real_rwds = np.array([]).reshape(0, 1).astype(np.float32)
-                self.env.currAttr = attr
-                self.env.currAnim = values
-                observation = self.env.reset().astype(np.float32)
-                while not done:
-                    action = self.result_model.predict(observation.reshape(1, self.num_states))
-                    _, real_reward, _, _ = self.env.step(action[0], addFrame=False)
-                    action = np.random.normal(action, epsilonGradient[j])  # randomize action
-                    observation_, reward, done, info = self.env.step(action[0])
-                    # store all values
-                    all_states = np.vstack([all_states, observation])
-                    all_actions = np.vstack([all_actions, action])
-                    ep_real_rwds = np.vstack([ep_real_rwds, real_reward])
-                    ep_rwds = np.vstack([ep_rwds, reward])
-                    observation = observation_
-                if self.rwdFile:
-                    with open(self.rwdFile,'a') as fd:
-                        fd.write("{}\n".format(np.mean(ep_rwds)))
-                dsc_rwds = self.discount_rewards(ep_rwds, self.rwdDiscount)
-                all_dsc_rwds = np.vstack([all_dsc_rwds, dsc_rwds])
-                real_dsc_rwds = self.discount_rewards(ep_real_rwds, self.rwdDiscount)
-                all_dsc_real_rwds = np.vstack([all_dsc_real_rwds, real_dsc_rwds])
+            done = False
+            ep_rwds = np.array([]).reshape(0, 1).astype(np.float32)
+            ep_real_rwds = np.array([]).reshape(0, 1).astype(np.float32)
+            observation = self.env.reset().astype(np.float32)
+            while not done:
+                action = self.result_model.predict(observation.reshape(1, self.num_states))
+                _, real_reward, _, _ = self.env.step(action[0], addFrame=False)
+                action = np.random.normal(action, epsilonGradient[j])  # randomize action
+                observation_, reward, done, info = self.env.step(action[0])
+                # store all values
+                all_states = np.vstack([all_states, observation])
+                all_actions = np.vstack([all_actions, action])
+                ep_real_rwds = np.vstack([ep_real_rwds, real_reward])
+                ep_rwds = np.vstack([ep_rwds, reward])
+                observation = observation_
+            if self.rwdFile:
+                with open(self.rwdFile,'a') as fd:
+                    fd.write("{}\n".format(np.mean(ep_rwds)))
+            dsc_rwds = self.discount_rewards(ep_rwds, self.rwdDiscount)
+            all_dsc_rwds = np.vstack([all_dsc_rwds, dsc_rwds])
+            real_dsc_rwds = self.discount_rewards(ep_real_rwds, self.rwdDiscount)
+            all_dsc_real_rwds = np.vstack([all_dsc_real_rwds, real_dsc_rwds])
             logger.info(f'{self.env.agent} Train {train_number} Episode {j}  Avg. reward {np.mean(all_dsc_real_rwds)}')
         return all_states, all_dsc_rwds, all_actions, all_dsc_real_rwds

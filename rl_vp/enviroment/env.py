@@ -1,4 +1,5 @@
 import math
+import random
 import logging
 import numpy as np
 from maya import cmds
@@ -10,30 +11,27 @@ from rl_vp.enviroment import rewards as rew_utils
 from rl_vp.enviroment import constants
 
 logger = logging.getLogger(__name__)
-DRIVER_ATTR = {"ry":(-120, 120), "rz":(-40, 150), "rx":(-120, 120)}
+DRIVER_ATTR = {"rx":(-120, 120), "ry":(-40, 120), "rz":(-120, 120)}
 
 class Enviroment():
 
-    def __init__(self, agent, drivers, maxFrame=20, hasAnimation=False):
+    def __init__(self, agent, drivers, maxFrame=20, hasAnimation=False, driver_attrs=DRIVER_ATTR):
         self.agent = mUtils.MNode(agent)
         self.drivers = [mUtils.MNode(a) for a in drivers]
         self.maxFrame = maxFrame
         self.action_space = len(constants.ACTIONS_MULTIPLIERS)
+        self.drivers_attrs = driver_attrs
         self.hasAnimation = hasAnimation
-        self.animations = [("attr", [0])]
         # self.mesh = mUtils.MNode(mesh)
         # self.mfn = self.mesh.getShape().getBestFn()
         # triangle_counts, triangle_vertices = self.mfn.getTriangles()
         # self.all_triangles = np.array(triangle_vertices).reshape(-1, 3)
-        if not hasAnimation:
-            self.animations = self.createAnimations()
-            self.currAttr = self.animations[0][0]
-            self.currAnim = self.animations[0][1]
         self.reInit(agent)
 
     def reInit(self, agent):
         self.agent = mUtils.MNode(agent)
         self.currentFrame = 0
+        self.animations = self.createAnimations()
         self.agent_pos = None
         self.agent_mtx = None
         self.rest_distance = 1.0
@@ -60,11 +58,12 @@ class Enviroment():
     def step(self, action, addFrame=True):
         if self.hasAnimation:
             cmds.currentTime(self.currentFrame)
-        elif hasattr(self.drivers[1], self.currAttr):
-            plug = getattr(self.drivers[1], self.currAttr)
-            plug.setFloat(self.currAnim[self.currentFrame])
-        else:
-            raise ValueError("Unable to create animation")
+        for attr, value in self.animations[self.currentFrame]:
+            if hasattr(self.drivers[1], attr):
+                plug = getattr(self.drivers[1], attr)
+                plug.setFloat(value)
+            else:
+                raise ValueError("Unable to create animation")
         self.setAction(action)
         observation = self.getState()
         reward = self.getReward()
@@ -89,15 +88,28 @@ class Enviroment():
         return self.getState()
 
     def createAnimations(self):
-        animations = list()
-        for attr, limits in DRIVER_ATTR.items():
-            animations.append((attr, np.linspace(0, math.radians(limits[0]), self.maxFrame)))
-            animations.append((attr, np.linspace(0, math.radians(limits[1]), self.maxFrame)))
+        animations = dict()
+        all_animations = dict()
+
+        for attr, limits in self.drivers_attrs.items():
+            max_value =  math.radians(random.randrange(limits[0], limits[1]))
+            all_animations[attr] = np.linspace(0, max_value, self.maxFrame)
+        for x in range(self.maxFrame):
+            animations[x] = list()
+            for attr in self.drivers_attrs.keys():
+                animations[x].append((attr, all_animations[attr][x]))
+        """
+        for frame in range(self.maxFrame):
+            frame_values = list()
+            for attr, limits in self.drivers_attrs.items():
+                value =  math.radians(random.randrange(limits[0], limits[1]))
+                frame_values.append((attr, value))
+            animations[frame] = frame_values
+        """
         return animations
 
     def resetJointDriver(self):
-        attributes = set([a for a, v in self.animations])
-        for attr in attributes:
+        for attr in self.drivers_attrs.keys():
             if not hasattr(self.drivers[1], attr):
                 continue
             plug = getattr(self.drivers[1], attr)

@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 # episode simulation and nn hyper params
 BATCH_SIZE = 1024
 GOAL_REWARD = .98
-GOAL_ESPISODES = 5
+GOAL_ESPISODES = 10
 
 def getModelPath(name=""):
     test_path = r'D:\dev\RL_Maya\tests'
@@ -78,7 +78,7 @@ def train(drivers, agents, name="", n_trains=8, n_episodes=16, epochs=32, batchM
     with open(agnt_file, 'w') as fd:
         fd.write("")
     env = Enviroment(agents[0], drivers, maxFrame)
-    ppoAgent = ppo_simple.Agent(env, rwdFile, rwdDiscount=.1)
+    ppoAgent = ppo_simple.Agent(env, rwdFile, rwdDiscount=0.5, hidden_size=1024, num_layers=1)
     rew_history = list()
     for tr_n in range(n_trains):
         # get all agents data --------------
@@ -97,12 +97,12 @@ def train(drivers, agents, name="", n_trains=8, n_episodes=16, epochs=32, batchM
             all_actions = np.vstack([all_actions, actions])
             all_rwds = np.vstack([all_rwds, rwds])
             all_real_rwds = np.vstack([all_real_rwds, real_rewd])
-        randomize = np.arange(len(all_states))
-        np.random.shuffle(randomize)
-        all_states = all_states[randomize]
-        all_actions = all_actions[randomize]
-        all_rwds = all_rwds[randomize]
-        all_real_rwds = all_real_rwds[randomize]
+        # randomize = np.arange(len(all_states))
+        # np.random.shuffle(randomize)
+        # all_states = all_states[randomize]
+        # all_actions = all_actions[randomize]
+        # all_rwds = all_rwds[randomize]
+        # all_real_rwds = all_real_rwds[randomize]
         # Train the model ------------------
         # get instance of early stopping callback, it stop if the model doesnt learn
         early_stop_patient = keras.callbacks.EarlyStopping(patience=8)
@@ -134,7 +134,7 @@ def train(drivers, agents, name="", n_trains=8, n_episodes=16, epochs=32, batchM
 
         ppoAgent.actor.save(os.path.join(backup_folder, f'{FILE_NAME}_actor_{tr_n:02d}.h5'))
         ppoAgent.critic.save(os.path.join(backup_folder, f'{FILE_NAME}_critic_{tr_n:02d}.h5'))
-        if len(rew_history) > GOAL_ESPISODES and (np.array(rew_history[GOAL_ESPISODES*-1:]) >= GOAL_REWARD).all():
-            logger.debug(np.array(rew_history[GOAL_ESPISODES*-1:]))
-            logger.info(f"Convergence of {GOAL_REWARD} Reached at train {tr_n}!")
-            return
+        #if len(rew_history) > GOAL_ESPISODES and (np.array(rew_history[GOAL_ESPISODES*-1:]) >= GOAL_REWARD).all():
+        #    logger.debug(np.array(rew_history[GOAL_ESPISODES*-1:]))
+        #    logger.info(f"Convergence of {GOAL_REWARD} Reached at train {tr_n}!")
+        #    return
