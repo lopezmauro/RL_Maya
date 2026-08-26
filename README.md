@@ -6,7 +6,7 @@
 
 **Mauro Lopez** — *XCS229ii* — *December 2020*
 
-<video src="images/vprl.mp4" width="100%" controls autoplay loop muted></video>
+![Volume Preservation Demo](images/vprl.gif)
 
 ## Abstract
 
